@@ -1,57 +1,63 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UMA.CharacterSystem;
+﻿using UMA.CharacterSystem;
 using UnityEngine;
-
-public class UMAMountedItemSample : MonoBehaviour
+namespace UMA
 {
-    public DynamicCharacterAvatar avatar;
-    public GameObject swordPrefab;
-    private string InstantiatedItemName;
-
-    public void Start()
+    public class UMAMountedItemSample : MonoBehaviour
     {
-        UMAMountedItem umi = swordPrefab.GetComponent<UMAMountedItem>();
-        if (umi != null)
-        {
-            InstantiatedItemName = swordPrefab.name + "_" + umi.ID;
-        }
-    }
-    public void MountSword()
-    {
-        if (string.IsNullOrEmpty(InstantiatedItemName))
-            return;
+        public DynamicCharacterAvatar avatar;
+        public GameObject swordPrefab;
+        private string InstantiatedItemName;
 
-        var item = GetItemIfMounted(swordPrefab,InstantiatedItemName);
-        if (item == null)
+        public void Start()
         {
-            GameObject go = GameObject.Instantiate(swordPrefab, avatar.gameObject.transform);
-            go.name = InstantiatedItemName;
-            go.SetActive(true);
+            UMAMountedItem umi = swordPrefab.GetComponent<UMAMountedItem>();
+            if (umi != null)
+            {
+                InstantiatedItemName = swordPrefab.name + "_" + umi.ID;
+            }
         }
-    }
+        public void MountSword()
+        {
+            if (string.IsNullOrEmpty(InstantiatedItemName))
+            {
+                return;
+            }
 
-    public void UnMountSword()
-    {
-        if (string.IsNullOrEmpty(InstantiatedItemName))
-            return;
-        
-        var item = GetItemIfMounted(swordPrefab,InstantiatedItemName);
-        if (item != null)
-        {
-            GameObject.Destroy(item);
+            var item = GetItemIfMounted(swordPrefab, InstantiatedItemName);
+            if (item == null)
+            {
+                GameObject go = GameObject.Instantiate(swordPrefab, avatar.gameObject.transform);
+                go.name = InstantiatedItemName;
+                go.SetActive(true);
+            }
         }
-    }
 
-    private GameObject GetItemIfMounted(GameObject go, string Name)
-    {
-        var mountedItems = avatar.gameObject.GetComponentsInChildren<UMAMountedItem>();
-        foreach (var item in mountedItems)
+        public void UnMountSword()
         {
-            // Don't mount more than once.
-            if (item.gameObject.name == Name)
-                return item.gameObject;
+            if (string.IsNullOrEmpty(InstantiatedItemName))
+            {
+                return;
+            }
+
+            var item = GetItemIfMounted(swordPrefab, InstantiatedItemName);
+            if (item != null)
+            {
+                GameObject.Destroy(item);
+            }
         }
-        return null;
+
+        private GameObject GetItemIfMounted(GameObject go, string Name)
+        {
+            var mountedItems = avatar.gameObject.GetComponentsInChildren<UMAMountedItem>();
+            foreach (var item in mountedItems)
+            {
+                // Don't mount more than once.
+                if (item.gameObject.name == Name)
+                {
+                    return item.gameObject;
+                }
+            }
+            return null;
+        }
     }
 }

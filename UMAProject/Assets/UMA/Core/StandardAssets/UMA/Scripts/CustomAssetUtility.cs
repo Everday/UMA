@@ -31,8 +31,9 @@ namespace UMA
             string assetPathAndName = AssetDatabase.GenerateUniqueAssetPath(path + "/New " + name + ".prefab");
 
             GameObject go = new GameObject(name);
-            foreach (System.Type t in types)
+            for (int i = 0; i < types.Length; i++)
             {
+                System.Type t = types[i];
                 go.AddComponent(t);
             }
 #if UNITY_2018_3_OR_NEWER
@@ -117,22 +118,28 @@ namespace UMA
 				assetPathAndName = GetAssetPathAndName<T>(baseName, AddTypeToName);
 			}
 
-			AssetDatabase.CreateAsset(asset, assetPathAndName);
+			var existingasset = AssetDatabase.LoadAssetAtPath(assetPathAndName, typeof(T));
+            AssetDatabase.CreateAsset(asset, assetPathAndName);
 
 	        AssetDatabase.SaveAssets();
 			if(selectCreatedAsset)
-				Selection.activeObject = asset;
-			return asset;
+            {
+                Selection.activeObject = asset;
+            }
+
+            return asset;
 	    }
 
-		/// <summary>
-		/// Generates a path and asset name
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="baseName"></param>
-		/// <param name="AddTypeToName"></param>
-		/// <returns></returns>
-		public static string GetAssetPathAndName<T>(string baseName, bool AddTypeToName) where T : ScriptableObject
+
+
+        /// <summary>
+        /// Generates a path and asset name
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="baseName"></param>
+        /// <param name="AddTypeToName"></param>
+        /// <returns></returns>
+        public static string GetAssetPathAndName<T>(string baseName, bool AddTypeToName) where T : ScriptableObject
 		{
 			string assetPathAndName;
 			var path = AssetDatabase.GetAssetPath(Selection.activeObject);
@@ -148,11 +155,42 @@ namespace UMA
 			string assetName = baseName;
 
 			if (AddTypeToName)
-				assetName = baseName + " " + typeof(T).Name;
+            {
+                assetName = baseName + " " + typeof(T).Name;
+            }
+
 
 			assetPathAndName = AssetDatabase.GenerateUniqueAssetPath(path + "/" + assetName + ".asset");
-			return assetPathAndName;
-		}
-	}
+            return assetPathAndName;
+        }
+        /// <summary>
+        /// Replaces an existing asset of the type T
+        /// </summary>
+        /// <param name="existingAssetPath">The full path relative to 'Assets' (including extension) of the existing asset to be replaced.</param>
+        /// <param name="selectCreatedAsset">If true the created asset will be selected after it is created (and show in the inspector)</param>
+        /// <returns>t</returns>
+        public static T ReplaceAsset<T>(string existingAssetPath, bool selectCreatedAsset = true) where T : ScriptableObject
+        {
+            T asset = ScriptableObject.CreateInstance<T>();
+
+            string assetPathAndName = UnityFriendlyPath(existingAssetPath);
+
+            var existingAsset = AssetDatabase.LoadAssetAtPath(assetPathAndName, typeof(T));
+            if (existingAsset != null)
+            {
+                AssetDatabase.DeleteAsset(assetPathAndName);
+            }
+
+            AssetDatabase.CreateAsset(asset, assetPathAndName);
+            AssetDatabase.SaveAssets();
+
+            if (selectCreatedAsset)
+            {
+                Selection.activeObject = asset;
+            }
+
+            return asset;
+        }
+    }
 }
 #endif

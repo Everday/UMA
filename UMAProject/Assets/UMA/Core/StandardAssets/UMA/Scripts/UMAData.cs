@@ -1257,10 +1257,16 @@ namespace UMA
 						}
 						else if (converter is IDynamicDNAConverter)
 						{
-							var dna = umaDna[dnaTypeHash];
-							_ = (DynamicUMADnaBase)dna;
-							_ = (IDynamicDNAConverter)converter;
-							((DynamicUMADnaBase)dna).dnaAsset = ((IDynamicDNAConverter)converter).dnaAsset;
+                            UMADnaBase dna = umaDna[dnaTypeHash];
+							if (dna is DynamicUMADnaBase)
+							{
+								_ = (IDynamicDNAConverter)converter;
+								((DynamicUMADnaBase)dna).dnaAsset = ((IDynamicDNAConverter)converter).dnaAsset;
+							}
+							else
+                            {
+								// Debug.LogError("Invalid converter "+converter.name+" on race " + raceData.raceName);
+                            }
 						}
 					}
 				}

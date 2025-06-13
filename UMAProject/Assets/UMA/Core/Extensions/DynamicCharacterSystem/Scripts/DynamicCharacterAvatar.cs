@@ -249,18 +249,6 @@ namespace UMA.CharacterSystem
             get { return base.umaRace; }
             set { base.umaRace = value; }
         }*/
-
-    /// <summary>
-    /// GTD: True if a build is queued on the avatar.
-    /// </summary>
-    public bool BuildQueued 
-    { 
-      get
-      {
-        return LoadQueue.Count > 0;
-      } 
-    }
-
         /// <summary>
         /// Set this before initialization to determine the active race. This can be set in the inspector
         /// using the activeRace dropdown.
@@ -2303,8 +2291,6 @@ namespace UMA.CharacterSystem
         /// 
         public void SetExpressionSet(bool addExressionPlayer = false)
         {
-      if (this == null)
-        return;
             var thisExpressionPlayer = gameObject.GetComponent<UMAExpressionPlayer>();
             if (thisExpressionPlayer == null && addExressionPlayer)
                 thisExpressionPlayer = gameObject.AddComponent<UMAExpressionPlayer>();
@@ -2446,7 +2432,7 @@ namespace UMA.CharacterSystem
             SaveOptions thisSaveOpts = SaveOptions.saveWardrobe;
             if (includeColors)
                 thisSaveOpts |= SaveOptions.saveColors;
-            return DoPartialSave(recipeName, thisSaveOpts, slotsToSave);
+            return DoPartialSave(recipeName, thisSaveOpts);
         }
 
         public string GetCurrentColorsRecipe(string recipeName = "")
@@ -2461,7 +2447,7 @@ namespace UMA.CharacterSystem
             return DoPartialSave(recipeName, thisSaveOpts);
         }
 
-        private string DoPartialSave(string recipeName, SaveOptions thisSaveOpts, string[] slotsToSave = null)
+        private string DoPartialSave(string recipeName, SaveOptions thisSaveOpts)
         {
             Dictionary<string, UMATextRecipe> wardrobeCache = new Dictionary<string, UMATextRecipe>(_wardrobeRecipes);
             Dictionary<string, UMAWardrobeCollection> wcCache = new Dictionary<string, UMAWardrobeCollection>(_wardrobeCollections);
@@ -2469,7 +2455,7 @@ namespace UMA.CharacterSystem
             if (ensureSharedColors)//we dont want to keep the colors in the recipe though (otherwise effectively ensureSharedColors is going to be true hereafter)
                 EnsureSharedColors();
             ClearWardrobeCollectionsRecipes(true);
-            var DCSModel = new UMATextRecipe.DCSPackRecipe(this, recipeName, "DynamicCharacterAvatar", thisSaveOpts, slotsToSave);
+            var DCSModel = new UMATextRecipe.DCSPackRecipe(this, recipeName, "DynamicCharacterAvatar", thisSaveOpts, null);
             if (ensureSharedColors)
             {
                 umaData.umaRecipe.sharedColors = prevSharedColors;
@@ -2555,12 +2541,9 @@ namespace UMA.CharacterSystem
                 else
                 {
                     asset.recipeType = "DynamicCharacterAvatar";
-          UMAAssetIndexer.Instance.RemoveAsset(typeof(UMATextRecipe),recipeName);
+
                     AssetDatabase.CreateAsset(asset, filePath);
                     AssetDatabase.SaveAssets();
-          var newasset = AssetDatabase.LoadAssetAtPath(filePath, typeof(UMADynamicCharacterAvatarRecipe));
-
-          UMAAssetIndexer.Instance.AddAsset(typeof(UMATextRecipe), recipeName, filePath, newasset);
                 }
 #else
                 FileUtils.WriteAllText(filePath, asset.recipeString);
@@ -2725,7 +2708,7 @@ namespace UMA.CharacterSystem
         {
             Initialize();
             umaData.OnCharacterBegun += this.SaveOverrideDNA;
-            umaData.OnCharacterUpdated += this.RestoreOverrideDna;
+            umaData.OnCharacterDnaUpdated += this.RestoreOverrideDna;
         }
 
         /// <summary>
@@ -2793,10 +2776,10 @@ namespace UMA.CharacterSystem
         /// <param name="customLoadOptions"></param>
         public void LoadFromRecipeString(string settingsToLoad, LoadOptions customLoadOptions = LoadOptions.useDefaults, bool ClearWardrobe = false)
         {
-			      if (ClearWardrobe)
-			      {
-				      this._wardrobeRecipes.Clear();
-			      }
+            if (ClearWardrobe)
+            {
+                this._wardrobeRecipes.Clear();
+            }
             ImportSettings(UMATextRecipe.PackedLoadDCS(context, settingsToLoad), customLoadOptions);
         }
 
@@ -3482,8 +3465,6 @@ namespace UMA.CharacterSystem
         /// <returns>Returns true if the final recipe load caused more assets to download</returns>
         private void LoadCharacter(UMARecipeBase umaRecipe, List<UMAWardrobeRecipe> Replaces, List<UMARecipeBase> umaAdditionalSerializedRecipes, UMARecipeBase[] AdditionalRecipes, Dictionary<string, List<MeshHideAsset>> MeshHideDictionary, List<string> hiddenSlots, List<string> HideTags, UMADnaBase[] CurrentDNA, bool restoreDNA, bool skipBundleCheck )
         {
-      if (this == null)
-        return;
 #if UMA_ADDRESSABLES
             if (!skipBundleCheck && isAddressableSystem)
             {
@@ -3961,7 +3942,7 @@ namespace UMA.CharacterSystem
             EditorUMAContextBase = GameObject.Find("UMAEditorContext");
             if (EditorUMAContextBase == null)
             {
-                var glib = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/UMA/UMA_GLIB.prefab");
+                var glib = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/UMA/Getting Started/UMA_GLIB.prefab");
                 if (glib != null)
                 {
                     glib.name = "UMAEditorContext";

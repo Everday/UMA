@@ -8,13 +8,17 @@ using UMA.CharacterSystem;
 
 namespace UMA.CharacterSystem.Editors
 {
-	[CustomEditor(typeof(DynamicCharacterAvatar), true)]
-	public partial class DynamicCharacterAvatarEditor : Editor
-	{		
-		public static bool showHelp = false;
-		public static bool showWardrobe = false;
-		public static bool showEditorCustomization = true;
-		public static bool showPrefinedDNA = false;
+    [CustomEditor(typeof(DynamicCharacterAvatar), true)]
+    public class DynamicCharacterAvatarEditor : Editor
+    {
+        public static bool showHelp = false;
+        public static bool showWardrobe = false;
+        public static bool showUtils = false; // JRRM set false before release
+        public static bool showEditorCustomization = true; // set true before release
+        public static bool showPrefinedDNA = false;
+        public static bool showAnimatorGUI = false;
+        public static bool showBlendshapes = false;
+        public static bool showUMAFramework = false;
 
 		public static int currentcolorfilter=0;
 		public string[] colorfilters = { "Base", "All", "Hide ColorDNA" };

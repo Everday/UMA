@@ -52,20 +52,24 @@ namespace UMA.Editors
 
 
             //CompatibleRaces drop area
-            if (DrawCompatibleRacesUI(TargetType, ShowHelp)) 
-				doUpdate = true;
+            if (DrawCompatibleRacesUI(TargetType, ShowHelp))
+            {
+                doUpdate = true;
+            }
 
-			//wardrobeSlots fields
-			if (DrawWardrobeSlotsFields(TargetType, ShowHelp))
-				doUpdate = true;
+            //wardrobeSlots fields
+            if (DrawWardrobeSlotsFields(TargetType, ShowHelp))
+            {
+                doUpdate = true;
+            }
 
-			if (DrawIncompatibleSlots(ShowHelp))
-				doUpdate = true;
+            if (DrawIncompatibleSlots(ShowHelp))
+            {
+                doUpdate = true;
+            }
 
-			//Set this up after the other so we can send the popup data with it
-			slotEditor = new WardrobeRecipeMasterEditor(_recipe, generatedBaseSlotOptions, generatedBaseSlotOptionsLabels);
-
-			EditorGUILayout.Space();
+            //Set this up after the other so we can send the popup data with it
+            slotEditor = new WardrobeRecipeMasterEditor(_recipe, generatedBaseSlotOptions, generatedBaseSlotOptionsLabels);
 			return doUpdate;
 		}
 	}

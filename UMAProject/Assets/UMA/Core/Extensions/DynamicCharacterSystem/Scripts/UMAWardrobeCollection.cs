@@ -1,14 +1,13 @@
 using UnityEngine;
 #if UNITY_EDITOR
-using UnityEditor;
 #endif
 using System.Collections.Generic;
 
 
 namespace UMA.CharacterSystem
 {
-	//Because this is a class for user generated content it is marked as partial so it can be extended without modifying the underlying code
-	public partial class UMAWardrobeCollection : UMATextRecipe
+    //Because this is a class for user generated content it is marked as partial so it can be extended without modifying the underlying code
+    public partial class UMAWardrobeCollection : UMATextRecipe
 	{
 		[Tooltip("Cover images for the collection as a whole. Use these for a promotional images for this collection, presenting the goodies inside.")]
 		public List<Sprite> coverImages = new List<Sprite>();
@@ -60,14 +59,19 @@ namespace UMA.CharacterSystem
 			{
 				//we maybe adding recipes for races we have not downloaded yet so make sure DCS has a place for them in its index
 				if (forRace != "")
-					UMAContext.Instance.EnsureRaceKey(forRace);
-				else
-					foreach (string race in compatibleRaces)
+                {
+                    UMAContext.Instance.EnsureRaceKey(forRace);
+                }
+                else
+                {
+                    for (int i = 0; i < compatibleRaces.Count; i++)
 					{
-						UMAContext.Instance.EnsureRaceKey(race);
+                        string race = compatibleRaces[i];
+                        UMAContext.Instance.EnsureRaceKey(race);
 					}
+                }
 
-				for (int i = 0; i < thisRecipeNames.Count; i++)
+                for (int i = 0; i < thisRecipeNames.Count; i++)
 				{
 					UMAContext.Instance.GetRecipe(thisRecipeNames[i], true);
 				}
@@ -88,8 +92,11 @@ namespace UMA.CharacterSystem
 			if(thisContext == null)
 			{
 				if (Debug.isDebugBuild)
-					Debug.LogWarning("Getting the WardrobeSet from a WardrobeCollection requires a valid UMAContextBase in the scene");
-				return new List<WardrobeSettings>();
+                {
+                    Debug.LogWarning("Getting the WardrobeSet from a WardrobeCollection requires a valid UMAContextBase in the scene");
+                }
+
+                return new List<WardrobeSettings>();
 			}
 			var thisRace = UMAContext.Instance.GetRace(race);
 			return GetRacesWardrobeSet(thisRace);
@@ -120,7 +127,7 @@ namespace UMA.CharacterSystem
 		/// <summary>
 		/// Gets the recipe names for the given race from the WardrobeCollection
 		/// </summary>
-		public List<string> GetRacesRecipeNames(string race, DynamicCharacterSystem dcs)
+		public List<string> GetRacesRecipeNames(string race)
 		{
 			var recipesToGet = GetRacesWardrobeSet(race);
 			List<string> recipesWeGot = new List<string>();
@@ -133,13 +140,14 @@ namespace UMA.CharacterSystem
 		/// <summary>
 		/// Gets the wardrobeRecipes for the given race from the WardrobeCollection
 		/// </summary>
-		public List<UMATextRecipe> GetRacesRecipes(string race, DynamicCharacterSystem dcs)
+		public List<UMATextRecipe> GetRacesRecipes(string race)
 		{
 			var recipesToGet = GetRacesWardrobeSet(race);
 			List<UMATextRecipe> recipesWeGot = new List<UMATextRecipe>();
 			for (int i = 0; i < recipesToGet.Count; i++)
 			{
-				recipesWeGot.Add(dcs.GetRecipe(recipesToGet[i].recipe, true));
+				var recipe = UMAAssetIndexer.Instance.GetRecipeWardrobeTextCollection(recipesToGet[i].recipe);
+                recipesWeGot.Add(recipe);
 			}
 			return recipesWeGot;
 		}
@@ -185,14 +193,16 @@ namespace UMA.CharacterSystem
 		/// <summary>
 		/// NOTE: Use GetUniversalPackRecipe to get a recipe that includes a wardrobeSet. Load this Recipe's recipeString into the specified UMAData.UMARecipe.
 		/// </summary>
-		public override void Load(UMA.UMAData.UMARecipe umaRecipe, UMAContextBase context)
+		public override void Load(UMA.UMAData.UMARecipe umaRecipe, UMAContextBase context, bool loadSlots = true)
 		{
 			if ((recipeString != null) && (recipeString.Length > 0))
 			{
 				var packedRecipe = PackedLoadDCSInternal(context);
 				if(packedRecipe != null)
-				   UnpackRecipe(umaRecipe, packedRecipe, context);
-			}
+                {
+                    UnpackRecipe(umaRecipe, packedRecipe, context, loadSlots);
+                }
+            }
 		}
 		#endregion
 

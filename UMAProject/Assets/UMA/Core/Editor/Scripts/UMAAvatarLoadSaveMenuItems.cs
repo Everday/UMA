@@ -1,16 +1,15 @@
 using UnityEngine;
 using UnityEditor;
-using UMA;
 using UMA.CharacterSystem;
 using System.Collections.Generic;
 using System.IO;
 using UMA.Examples;
 using UMA.PoseTools;
-using static UMA.UMAPackedRecipeBase;
+using static UMA.UMAData;
 
 namespace UMA.Editors
 {
-	public class UMAAvatarLoadSaveMenuItems : Editor
+    public class UMAAvatarLoadSaveMenuItems : Editor
 	{
 		[UnityEditor.MenuItem("GameObject/UMA/Save Mecanim Avatar to Asset (runtime only)")]
 		[MenuItem("UMA/Runtime/Save Selected Avatars Mecanim Avatar to Asset", priority = 1)]
@@ -74,9 +73,14 @@ namespace UMA.Editors
 			int meshno = 0;
 			foreach (SkinnedMeshRenderer smr in renderers)
 			{
-				Material[] mats = smr.sharedMaterials;
+				Material[] omats = smr.sharedMaterials;
+                Material[] mats = new Material[omats.Length];
+                for (int i = 0; i < omats.Length; i++)
+                {
+                    mats[i] = new Material(omats[i]);
+                }
 
-				int Material = 0;
+                int Material = 0;
 				foreach (Material m in mats)
 				{
 					// get each texture.
@@ -92,21 +96,30 @@ namespace UMA.Editors
 							Texture texture = m.GetTexture(propertyName);
 							if (texture is Texture2D || texture is RenderTexture)
 							{
-								bool isNormal = false;
 								string path = AssetDatabase.GetAssetPath(texture.GetInstanceID());
 								if (string.IsNullOrEmpty(path))
 								{
-									if (ConvertNormalMaps)
+									bool isNormal = (propertyName.ToLower().Contains("bumpmap") || propertyName.ToLower().Contains("normal"));
+
+                                    if (ConvertNormalMaps)
 									{
-										if (propertyName.ToLower().Contains("bumpmap") || propertyName.ToLower().Contains("normal"))
+										if (isNormal)
 										{
-											// texture = ConvertNormalMap(texture);
 											texture = sconvertNormalMap(texture);
-											isNormal = true;
 										}
 									}
 									string texName = Path.Combine(Folder, CharName + "_Mat_" + Material + propertyName + ".png");
-									SaveTexture(texture, texName);
+									if (texture is RenderTexture)
+                                    {
+										Debug.Log("Saving Render Texture " + texName);
+                                        LinearSave(texture as RenderTexture, texName,isNormal);
+                                    }
+                                    else
+                                    {
+										Debug.Log("Saving texture " + texName);
+                                        SaveTexture2D(texture as Texture2D, texName, isNormal);
+                                    }
+                                    //SaveTexture(texture, texName);
 									AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 									if (isNormal)
                                     {
@@ -118,15 +131,19 @@ namespace UMA.Editors
 										EditorUtility.SetDirty(importer);
 										importer.SaveAndReimport();
 									}
+                                    Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(CustomAssetUtility.UnityFriendlyPath(texName));
 
-									Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(CustomAssetUtility.UnityFriendlyPath(texName));
-									m.SetTexture(propertyName, tex);
+                                    m.SetTexture(propertyName, tex);
 								}
+								else
+								{
+									m.SetTexture(propertyName, texture);
+                                }
 							}
 						}
 					}
 					string matname = Folder + "/"+CharName+"_Mat_" + Material + ".mat"; 
-					CustomAssetUtility.SaveAsset<Material>(m, matname);
+                    CustomAssetUtility.SaveAsset<Material>(m, matname);
 					Material++;
 					// Save the material to disk?
 					// update the SMR
@@ -135,7 +152,7 @@ namespace UMA.Editors
 				string meshName = Folder + "/"+CharName+"_Mesh_" + meshno + ".asset";
 				meshno++;
 				// Save Mesh to disk.
-				smr.sharedMesh.Optimize();
+				// smr.sharedMesh.Optimize(); This blows up some versions of Unity.
 				CustomAssetUtility.SaveAsset<Mesh>(smr.sharedMesh, meshName);
 				smr.sharedMaterials = mats;
 				smr.materials = mats;
@@ -149,9 +166,12 @@ namespace UMA.Editors
 
 			DestroyImmediate(avatar);
 			var lod = baseObject.GetComponent<UMASimpleLOD>();
-			if (lod != null) DestroyImmediate(lod);
+			if (lod != null)
+            {
+                DestroyImmediate(lod);
+            }
 
-			if (AddStandaloneDNA)
+            if (AddStandaloneDNA)
 			{
 				UMAData uda = baseObject.GetComponent<UMAData>();
 				StandAloneDNA sda = baseObject.AddComponent<UMA.StandAloneDNA>();
@@ -166,19 +186,25 @@ namespace UMA.Editors
 			else
 			{
 				var ud = baseObject.GetComponent<UMAData>();
-				if (ud != null) DestroyImmediate(ud);
-			}
+				if (ud != null)
+                {
+                    DestroyImmediate(ud);
+                }
+            }
 			var ue = baseObject.GetComponent<UMAExpressionPlayer>();
-			if (ue != null) DestroyImmediate(ue);
+			if (ue != null)
+            {
+                DestroyImmediate(ue);
+            }
 
-			baseObject.name = CharName;
+            baseObject.name = CharName;
 			string prefabName = Folder + "/"+CharName+".prefab";
 			prefabName = CustomAssetUtility.UnityFriendlyPath(prefabName);
 			PrefabUtility.SaveAsPrefabAssetAndConnect(baseObject, prefabName, InteractionMode.AutomatedAction);
 		}
 
 
-		[UnityEditor.MenuItem("GameObject/UMA/Save Atlas Textures (runtime only)")]
+		[UnityEditor.MenuItem("GameObject/UMA/Save Atlas Textures")]
 		[MenuItem("CONTEXT/DynamicCharacterAvatar/Save Selected Avatars generated textures to PNG", false, 10)]
 		[MenuItem("UMA/Runtime/Save Selected Avatar Atlas Textures")]
 		public static void SaveSelectedAvatarsPNG()
@@ -210,71 +236,184 @@ namespace UMA.Editors
 			{
 				string basename = System.IO.Path.GetFileNameWithoutExtension(path);
 				string pathname = System.IO.Path.GetDirectoryName(path);
-				// save the diffuse texture
-				for (int i = 0; i < smr.materials.Length; i++)
+
+                // Get the UMAMaterials for each atlas.
+
+                UMAData umaData = avatar.umaData;
+                GeneratedMaterials gmatContainer = umaData.generatedMaterials;
+
+				int i = 0;
+				foreach (var gm in gmatContainer.materials)
 				{
-					Material mat = smr.materials[i];
-					string PathBase = System.IO.Path.Combine(pathname, basename + "_material_" + i.ToString());
+					UMAMaterial umat = gm.umaMaterial;
+					Material mat = gm.skinnedMeshRenderer.sharedMaterials[gm.materialIndex];
+                    Material omat = gm.material;
+					foreach(var tex in umat.GetTexturePropertyNames())
+                    {
+                        Texture texture = mat.GetTexture(tex);
+                        if (texture != null)
+						{
+							string tname = $"{pathname}/{basename}_{i}_{umat.name}{tex}.PNG";
+							string altName = $"{pathname}/{basename}_alt_{i}_{umat.name}{tex}.PNG";
 
-					string[] texNames = mat.GetTexturePropertyNames();
-
-					foreach (string tex in texNames)
-					{
-						string texname = PathBase + tex + ".PNG";
-						Texture texture = mat.GetTexture(tex);
-						if (texture != null) SaveTexture(texture, texname);
-					}
-				}
-			}
+                            try
+							{
+								if (tex.ToLower().Contains("normal") || tex.ToLower().Contains("bump"))
+                                {
+                                    SaveTexture(texture, tname, true);
+                                }
+                                else
+                                {
+                                    SaveTexture(texture, tname);
+                                }
+							}
+                            catch  
+                            { 
+								// Not a readable texture. This is actually OK. Wish isReadable wasn't broken.
+                            }
+                        }
+                    }
+					i++;
+                }
+            }
 		}
 
-		private static void SaveTexture(Texture texture, string diffuseName, bool isNormal = false)
+
+        private static Texture2D GetReadableTexture(RenderTexture texture, bool isNormal)
+        {
+            RenderTexture tmp;
+
+            if (isNormal)
+            {
+                tmp = RenderTexture.GetTemporary(
+                texture.width,
+                texture.height,
+                0,
+                RenderTextureFormat.Default,
+                RenderTextureReadWrite.Linear);
+            }
+            else
+            {
+                tmp = RenderTexture.GetTemporary(
+                texture.width,
+                texture.height,
+                0,
+                RenderTextureFormat.Default,
+                RenderTextureReadWrite.sRGB);
+            }
+
+            Graphics.Blit(texture, tmp);
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = tmp;
+
+            Texture2D readableTexture = new Texture2D(texture.width, texture.height,TextureFormat.RGBA32, false, isNormal);
+            readableTexture.ReadPixels(new Rect(0, 0, tmp.width, tmp.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(tmp);
+
+            return readableTexture;
+        }
+        // Thanks, Brooklyn!
+        private static Texture2D GetReadableTexture(Texture2D texture, bool isNormal)
+        {
+			RenderTexture tmp;
+
+            if (isNormal)
+			{
+                tmp = RenderTexture.GetTemporary(
+                texture.width,
+                texture.height,
+                0,
+                RenderTextureFormat.Default,
+                RenderTextureReadWrite.Linear);
+            }
+            else
+			{
+                tmp = RenderTexture.GetTemporary(
+                texture.width,
+                texture.height,
+                0,
+                RenderTextureFormat.Default,
+                RenderTextureReadWrite.sRGB);
+            }
+
+            Graphics.Blit(texture, tmp);
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = tmp;
+
+			Texture2D readableTexture = new Texture2D(texture.width, texture.height, texture.format, false, isNormal);
+            readableTexture.ReadPixels(new Rect(0, 0, tmp.width, tmp.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(tmp);
+
+            return readableTexture;
+        }
+
+        private static void SaveTexture(Texture texture, string diffuseName, bool isNormal = false)
 		{
+			if (isNormal)
+			{
+				texture = sconvertNormalMap(texture);
+                SaveTexture(texture, diffuseName, false);
+				return;
+			}
+
 			if (texture is RenderTexture)
 			{
-				SaveRenderTexture(texture as RenderTexture, diffuseName, isNormal);
-				return;
+                //Debug.Log("Saving render texture: " + diffuseName);
+                //SaveRenderTexture(texture as RenderTexture, diffuseName, isNormal);
+                Texture2D tex = GetReadableTexture(texture as RenderTexture, isNormal);
+                SaveTexture2D(tex, diffuseName, isNormal);
+                DestroyImmediate(tex);
+                return;
 			}
 			else if (texture is Texture2D)
 			{
-				SaveTexture2D(texture as Texture2D, diffuseName);
-				return;
+                Texture2D tex = GetReadableTexture(texture as Texture2D, isNormal);
+                SaveTexture2D(tex, diffuseName, isNormal);
+                DestroyImmediate(tex);
+                return;
 			}
 			EditorUtility.DisplayDialog("Error", "Texture is not RenderTexture or Texture2D", "OK");
 		}
 
 		/// <param name="normalMap"></param>
 		/// <returns></returns>
-		private static Texture2D sconvertNormalMap(Texture2D normalMap)
+		private static Texture2D SConvertNormalMap(Texture2D normalMap)
 		{
 			ComputeShader normalMapConverter = Resources.Load<ComputeShader>("Shader/NormalShader");
-			int kernel = normalMapConverter.FindKernel("NormalConverter");
-			RenderTexture normalMapRenderTex = new RenderTexture(normalMap.width, normalMap.height, 24);
+			int kernel = normalMapConverter.FindKernel("NormalCvt");
+			// RenderTexture normalMapRenderTex = new RenderTexture(normalMap.width, normalMap.height, 24);
+			var normalMapRenderTex = RenderTexture.GetTemporary(normalMap.width, normalMap.height, 24);
 			normalMapRenderTex.enableRandomWrite = true;
-			normalMapRenderTex.Create();
-			normalMapConverter.SetTexture(kernel, "Input", normalMap);
-			normalMapConverter.SetTexture(kernel, "Result", normalMapRenderTex);
-			normalMapConverter.Dispatch(kernel, normalMap.width, normalMap.height, 1);
-			RenderTexture.active = normalMapRenderTex;
+            //normalMapRenderTex.Create();
 
-			Texture2D convertedNormalMap = new Texture2D(normalMap.width, normalMap.height, TextureFormat.RGBA32, false, true);
-			convertedNormalMap.ReadPixels(new Rect(0, 0, normalMap.width, normalMap.height), 0, 0);
+            normalMapConverter.SetTexture(kernel, "Input", normalMap);
+			normalMapConverter.SetTexture(kernel, "Result", normalMapRenderTex);
+			normalMapConverter.Dispatch(kernel, normalMap.width / 8, normalMap.height / 8, 1);
+            Texture2D convertedNormalMap = new Texture2D(normalMap.width, normalMap.height, TextureFormat.RGBA32, false, true);
+            RenderTexture.active = normalMapRenderTex;
+            convertedNormalMap.ReadPixels(new Rect(0, 0, normalMap.width, normalMap.height), 0, 0);
 			convertedNormalMap.Apply();
 
-			DestroyImmediate(normalMapRenderTex);
+			RenderTexture.ReleaseTemporary(normalMapRenderTex);
 			return convertedNormalMap;
 		}
 
-		private static Texture2D sconvertNormalMap(RenderTexture normalMap)
+		private static Texture2D SConvertNormalMap(RenderTexture normalMap)
 		{
 			ComputeShader normalMapConverter = Resources.Load<ComputeShader>("Shader/NormalShader");
-			int kernel = normalMapConverter.FindKernel("NormalConverter");
+			int kernel = normalMapConverter.FindKernel("NormalCvt");
 			RenderTexture normalMapRenderTex = new RenderTexture(normalMap.width, normalMap.height, 24);
 			normalMapRenderTex.enableRandomWrite = true;
 			normalMapRenderTex.Create();
 			normalMapConverter.SetTexture(kernel, "Input", normalMap);
 			normalMapConverter.SetTexture(kernel, "Result", normalMapRenderTex);
-			normalMapConverter.Dispatch(kernel, normalMap.width, normalMap.height, 1);
+			normalMapConverter.Dispatch(kernel, normalMap.width/8, normalMap.height/8, 1);
 			RenderTexture.active = normalMapRenderTex;
 
 			Texture2D convertedNormalMap = new Texture2D(normalMap.width, normalMap.height, TextureFormat.RGBA32, false, true);
@@ -288,7 +427,7 @@ namespace UMA.Editors
 		private static Texture2D sconvertNormalMap2(RenderTexture rt)
 		{
 			Texture2D tex = GetRTPixels(rt);
-			Texture2D result = sconvertNormalMap(tex);
+			Texture2D result = SConvertNormalMap(tex);
 			DestroyImmediate(tex);
 			return result;
 		}
@@ -296,16 +435,20 @@ namespace UMA.Editors
 		private static Texture2D sconvertNormalMap(Texture tex)
 		{
 			if (tex is RenderTexture)
-				return sconvertNormalMap(tex as RenderTexture);
-
-			return sconvertNormalMap(tex as Texture2D);
+            {
+                return SConvertNormalMap(tex as RenderTexture);
+            }
+            return SConvertNormalMap(tex as Texture2D);
 		}
 
 		static public Texture2D GetRTPixels(RenderTexture rt)
 		{
-			/// Some goofiness ends up with the texture being too dark unless
-			/// I send it to a new render texture.
-			RenderTexture outputMap = new RenderTexture(rt.width, rt.height, 32);
+            // Remember crrently active render texture
+            RenderTexture currentActiveRT = RenderTexture.active;
+
+            /// Some goofiness ends up with the texture being too dark unless
+            /// I send it to a new render texture.
+            RenderTexture outputMap = new RenderTexture(rt.width, rt.height, 32, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB); 
 			outputMap.enableRandomWrite = true;
 			outputMap.Create();
 			RenderTexture.active = outputMap;
@@ -313,8 +456,6 @@ namespace UMA.Editors
 			Graphics.Blit(rt, outputMap);
 
 
-			// Remember currently active render texture
-			RenderTexture currentActiveRT = RenderTexture.active;
 
 			// Set the supplied RenderTexture as the active one
 			RenderTexture.active = outputMap;
@@ -329,35 +470,48 @@ namespace UMA.Editors
 			return tex;
 		}
 
-		private static void SaveRenderTexture(RenderTexture texture, string textureName, bool isNormal = false)
+        static public void LinearSave(RenderTexture rt, string textureName, bool isNormal)
+        {
+            // Remember crrently active render texture
+            RenderTexture currentActiveRT = RenderTexture.active;
+
+            // Set the supplied RenderTexture as the active one
+            RenderTexture.active = rt;
+
+            // Create a new Texture2D and read the RenderTexture image into it
+            Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.ARGB32, false, true);
+            tex.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+
+            // Restore previously active render texture
+            RenderTexture.active = currentActiveRT;
+            SaveTexture2D(tex, textureName, isNormal);
+            
+        }
+
+        public static void SaveRenderTexture(RenderTexture texture, string textureName, bool isNormal = false)
 		{
 			Texture2D tex;
 
 			if (isNormal)
 			{
-				tex = sconvertNormalMap(texture);
+				tex = SConvertNormalMap(texture);
 			}
 			else
 			{
 				tex = GetRTPixels(texture);
 			}
-			SaveTexture2D(tex, textureName);
+			SaveTexture2D(tex, textureName, isNormal);
 		}
 
-		private static void SaveTexture2D(Texture2D texture, string textureName)
+		private static void SaveTexture2D(Texture2D texture, string textureName, bool isNormal)
 		{
-			if (texture.isReadable)
-			{
-				byte[] data = texture.EncodeToPNG();
-				System.IO.File.WriteAllBytes(textureName, data);
-			}
-			else
-			{
-				Debug.LogError("Texture: " + texture.name + " is not readable. Skipping.");
-			}
-		}
+            Texture2D convertedTexture = GetReadableTexture(texture, isNormal);
+			byte[] data = convertedTexture.EncodeToPNG();
+			DestroyImmediate(convertedTexture);
+            System.IO.File.WriteAllBytes(textureName, data);
+        }
 
-		[UnityEditor.MenuItem("CONTEXT/DynamicCharacterAvatar/Save as UMA Preset")]
+        [UnityEditor.MenuItem("CONTEXT/DynamicCharacterAvatar/Save as UMA Preset")]
 		[UnityEditor.MenuItem("GameObject/UMA/Save as UMA Preset")]
 		[MenuItem("UMA/Load and Save/Save Selected Avatar as UMA Preset", priority = 1)]
 		public static void SaveSelectedAvatarsPreset()
@@ -672,8 +826,10 @@ namespace UMA.Editors
 				if (UAI.IsIndexedType(type))
 				{
 					if (UAI.EvilAddAsset(type, o))
-						added++;
-				}
+                    {
+                        added++;
+                    }
+                }
 			}
 			UAI.ForceSave();
 			EditorUtility.DisplayDialog("Success", added + " item(s) added to Global Library", "OK");

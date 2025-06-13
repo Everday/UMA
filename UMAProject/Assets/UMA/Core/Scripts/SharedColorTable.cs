@@ -16,7 +16,9 @@ namespace UMA
 		}
 	#endif
 		public int channelCount;
-		public string sharedColorName;
+		
+        public string sharedColorName;
+		[NonReorderable]
 		public OverlayColorData[] colors;
 
 		#region ISerializationCallbackReceiver Members
@@ -29,10 +31,10 @@ namespace UMA
 		{
 			if (colors != null)
 			{
-				foreach (var color in colors)
+                for (int i = 0; i < colors.Length; i++)
 				{
-					color.EnsureChannels(channelCount);
-					color.name = sharedColorName;
+                    OverlayColorData color = colors[i];
+                    color.EnsureChannelsExact(channelCount);
 				}
 			}
 		}

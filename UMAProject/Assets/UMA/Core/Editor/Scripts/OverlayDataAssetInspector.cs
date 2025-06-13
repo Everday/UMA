@@ -14,11 +14,13 @@ namespace UMA.Editors
 		private SerializedProperty _overlayType;
 		private SerializedProperty _umaMaterial;
 		private SerializedProperty _textureList;
+		private SerializedProperty _blendList;
 		private SerializedProperty _channels;
 		private SerializedProperty _rect;
 		private SerializedProperty _alphaMask;
 		private SerializedProperty _tags;
 		private SerializedProperty _occlusionEntries;
+		private SerializedProperty _noAutoAdd;
 
 
 		void OnEnable()
@@ -27,10 +29,13 @@ namespace UMA.Editors
 			_overlayType = serializedObject.FindProperty("overlayType");
 			_umaMaterial = serializedObject.FindProperty("material");
 			_textureList = serializedObject.FindProperty("textureList");
+			_blendList =   serializedObject.FindProperty("overlayBlend");
 			_rect = serializedObject.FindProperty("rect");
 			_alphaMask = serializedObject.FindProperty("alphaMask");
 			_tags = serializedObject.FindProperty("tags");
 			_occlusionEntries = serializedObject.FindProperty("OcclusionEntries");
+            _noAutoAdd = serializedObject.FindProperty("noAutoAdd");
+            (target as OverlayDataAsset).tagsList = GUIHelper.InitTagsList("tags",serializedObject);
 
 			EditorApplication.update += DoDelayedSave;
 		}
@@ -49,7 +54,7 @@ namespace UMA.Editors
 				od.doSave = false;
 				od.lastActionTime = Time.realtimeSinceStartup;
 				EditorUtility.SetDirty(target);
-				AssetDatabase.SaveAssets();
+				//AssetDatabase.SaveAssets();
 				UMAUpdateProcessor.UpdateOverlay(target as OverlayDataAsset);
 			}
 		}
@@ -58,8 +63,11 @@ namespace UMA.Editors
 		{
 			OverlayDataAsset od = target as OverlayDataAsset;
 			if (od.lastActionTime == 0)
-				od.lastActionTime = Time.realtimeSinceStartup;
+            {
+                od.lastActionTime = Time.realtimeSinceStartup;
+            }
 
+            od.ValidateBlendList();
 			serializedObject.Update();
 
 			EditorGUI.BeginChangeCheck();
@@ -67,7 +75,8 @@ namespace UMA.Editors
 			EditorGUILayout.PropertyField(_overlayName);
 			EditorGUILayout.PropertyField(_overlayType);
 			EditorGUILayout.PropertyField(_rect);
-			EditorGUILayout.LabelField("Note: It is recommended to use UV coordinates (0.0 -> 1.0) in 2.10+ for rect fields.", EditorStyles.helpBox);
+            EditorGUILayout.PropertyField(_noAutoAdd);
+            EditorGUILayout.LabelField("Note: It is recommended to use UV coordinates (0.0 -> 1.0) in 2.10+ for rect fields.", EditorStyles.helpBox);
 
 			EditorGUILayout.PropertyField(_umaMaterial);
 
@@ -78,19 +87,25 @@ namespace UMA.Editors
 				_channels = tempObj.FindProperty("channels");
 
 				if (_channels == null)
-					EditorGUILayout.HelpBox("Channels not found!", MessageType.Error);
-				else
-					textureChannelCount = _channels.arraySize;
+                {
+                    EditorGUILayout.HelpBox("Channels not found!", MessageType.Error);
+                }
+                else
+                {
+                    textureChannelCount = _channels.arraySize;
+                }
 
-				od.textureFoldout = GUIHelper.FoldoutBar(od.textureFoldout, "Texture Channels");
+                od.textureFoldout = GUIHelper.FoldoutBar(od.textureFoldout, $"Texture Channels ({textureChannelCount}) Material Channels ({_textureList.arraySize})");
 
 				if (od.textureFoldout)
 				{
 					GUIHelper.BeginVerticalPadded(10, new Color(0.75f, 0.875f, 1f));
 					EditorGUILayout.PropertyField(_textureList.FindPropertyRelative("Array.size"));
+					_blendList.arraySize = _textureList.arraySize;
 					for (int i = 0; i < _textureList.arraySize; i++)
 					{
 						SerializedProperty textureElement = _textureList.GetArrayElementAtIndex(i);
+						SerializedProperty blendElement = _blendList.GetArrayElementAtIndex(i);
 						string materialName = "Unknown";
 
 						if (i < _channels.arraySize)
@@ -105,15 +120,17 @@ namespace UMA.Editors
 								}
 							}
 						}
-
-						EditorGUILayout.PropertyField(textureElement, new GUIContent(materialName));
+						GUILayout.BeginHorizontal();
+						EditorGUILayout.PropertyField(textureElement, new GUIContent(materialName), GUILayout.ExpandWidth(true));
+						EditorGUILayout.PropertyField(blendElement, new GUIContent(""), GUILayout.Width(110));
+						GUILayout.EndHorizontal();
 					}
 					GUIHelper.EndVerticalPadded(10);
 				}
 
 				if ( _textureList.arraySize != textureChannelCount)
 				{
-					EditorGUILayout.HelpBox("Overlay Texture count and UMA Material channel count don't match!", MessageType.Error);
+					EditorGUILayout.HelpBox($"Overlay Texture count {_textureList.arraySize} and UMA Material channel count {textureChannelCount} don't match!", MessageType.Error);
 				}
 
 				if (!_textureList.hasMultipleDifferentValues)
@@ -122,27 +139,47 @@ namespace UMA.Editors
 					for (int i = 0; i < _textureList.arraySize; i++)
 					{
 						if (_textureList.GetArrayElementAtIndex(i).objectReferenceValue == null)
-							allValid = false;
-					}
+                        {
+                            allValid = false;
+                        }
+                    }
 					if (!allValid)
-						EditorGUILayout.HelpBox("Not all textures in Texture List set. This overlay will only work as an additional overlay in a recipe", MessageType.Warning);
-				}
+                    {
+                        EditorGUILayout.HelpBox("Not all textures in Texture List set. This overlay will only work as an additional overlay in a recipe", MessageType.Warning);
+                    }
+                }
 			}
 			else
-				EditorGUILayout.HelpBox("No UMA Material selected!", MessageType.Warning);
+            {
+                EditorGUILayout.HelpBox("No UMA Material selected!", MessageType.Warning);
+            }
 
-			GUILayout.Space(20f);
-			od.additionalFoldout = GUIHelper.FoldoutBar(od.additionalFoldout, "Additional Parameters");
+			od.additionalFoldout = GUIHelper.FoldoutBar(od.additionalFoldout, "Alpha mask Parameters");
 			if (od.additionalFoldout)
 			{
 				GUIHelper.BeginVerticalPadded(10, new Color(0.75f, 0.875f, 1f));
+				EditorGUILayout.HelpBox("The alpha mask is optional. If it is not set the texture[0].alpha is used instead.", MessageType.Info);
 				EditorGUILayout.PropertyField(_alphaMask);
-				EditorGUILayout.PropertyField(_tags, true);
-				EditorGUILayout.PropertyField(_occlusionEntries, true);
 				GUIHelper.EndVerticalPadded(10);
 			}
 
-			serializedObject.ApplyModifiedProperties();
+			od.tagsFoldout = GUIHelper.FoldoutBar(od.tagsFoldout, "Tags");
+			if (od.tagsFoldout)
+			{
+                GUIHelper.BeginVerticalPadded(10, new Color(0.75f, 0.875f, 1f));
+                // EditorGUILayout.PropertyField(_tags, true);
+                (target as OverlayDataAsset).tagsList.DoLayoutList();
+                GUIHelper.EndVerticalPadded(10);
+			}
+
+			od.occlusionFoldout = GUIHelper.FoldoutBar(od.occlusionFoldout, "Occlusion");
+			if (od.occlusionFoldout)
+			{
+				GUIHelper.BeginVerticalPadded(10, new Color(0.75f, 0.875f, 1f));
+				EditorGUILayout.PropertyField(_occlusionEntries, true);
+				GUIHelper.EndVerticalPadded(10);
+			}
+            serializedObject.ApplyModifiedProperties();
 			if (EditorGUI.EndChangeCheck())
 			{
 				od.lastActionTime = Time.realtimeSinceStartup;
