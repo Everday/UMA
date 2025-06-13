@@ -1258,6 +1258,8 @@ namespace UMA
 						else if (converter is IDynamicDNAConverter)
 						{
 							var dna = umaDna[dnaTypeHash];
+							_ = (DynamicUMADnaBase)dna;
+							_ = (IDynamicDNAConverter)converter;
 							((DynamicUMADnaBase)dna).dnaAsset = ((IDynamicDNAConverter)converter).dnaAsset;
 						}
 					}

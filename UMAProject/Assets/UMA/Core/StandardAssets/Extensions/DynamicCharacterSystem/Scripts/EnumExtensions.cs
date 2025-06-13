@@ -11,8 +11,8 @@ namespace UMA.CharacterSystem
 				throw new ArgumentException("HasFlag : Flag is not of the type of Enum");
 			}
 
-			var selfValue = Convert.ToUInt64(self);
-			var flagValue = Convert.ToUInt64(flag);
+			var selfValue = Convert.ToInt64(self);
+			var flagValue = Convert.ToInt64(flag);
 
 			return (selfValue & flagValue) == flagValue;
 		}

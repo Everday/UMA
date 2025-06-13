@@ -57,7 +57,7 @@ namespace UMA
                 case "VectorArray":
                     return new UMAVectorArrayProperty() { name = str[2] };
                 case "Texture":
-                    return new UMATextureProperty() { name = str[2] };
+                    return new UMATextureProperty() { name = str[1] };
                 case "FloatArray":
                     return new UMAFloatArrayProperty() { name = str[2] };
                 case "Matrix":

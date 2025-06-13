@@ -94,7 +94,7 @@ namespace UMA.Editors
 
         }
 
-        private void Cleanup()
+        private new void Cleanup()
         {
             // Guard against Unity calling this via update multiple times even after
             // it's been removed from the event. Only happens on Mac.
@@ -105,7 +105,6 @@ namespace UMA.Editors
             Instance = null;
             EditorApplication.update -= GeometryUpdate;
             Tools.hidden = false;
-            DestroySceneEditObject();
             EditorApplication.UnlockReloadAssemblies();
 
             if (restoreScenes != null)
@@ -125,6 +124,7 @@ namespace UMA.Editors
 #endif
                 }
             }
+            DestroySceneEditObject();
         }
 
         public override void OnInspectorGUI()

@@ -55,6 +55,9 @@ namespace UMA
 		}
 		public void Initialize()
 		{
+			if (this == null)
+				return;
+
 			if (context == null)
 			{
 				context = UMAContextBase.Instance;
